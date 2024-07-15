@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 import textwrap
 
 class Cliente:
@@ -135,9 +135,18 @@ class Historico:
         self._transacoes.append({
             "tipo": transacao.__class__.__name__,
             "valor": transacao.valor,
-            "data": datetime.now().strftime("%d/%m/%Y,%H:%M:%S"),
+            "data": datetime.now(timezone.utc).strftime("%d/%m/%Y,%H:%M:%S"),
         })
         
+    def tansacoes_do_dia(self):
+        data_hoje = datetime.now(timezone.utc).date()
+        transasoes_dia = [transacao for transacao in self._transacoes if datetime.strptime(transacao["data"],"%d/%m/%Y,%H:%M:%S" ).date() == data_hoje ]
+    
+        return transasoes_dia
+    
+    def gerar_relatorio(self):
+        pass
+       
 class Transacao(ABC):
     @property
     @abstractmethod
@@ -178,8 +187,12 @@ class Deposito(Transacao):
 
 
 def log_decorador(funcao):
-    name_function = funcao.__class__.__name__
-    log = []
+    def decora(*args, **kwargs):
+        name_function =  str.join(" ",str.split(funcao.__name__, sep="_"))
+        funcao(*args, **kwargs)
+        print(f"\n{datetime.now(timezone.utc).strftime("%d-%m-%Y %H:%M:%S")} - {name_function.title()}", end="\n\n")
+        input(" Press Enter para voltar! ".center(50, "-"))
+    return decora
     
  
 def menu(): 
@@ -212,6 +225,7 @@ def verifica_conta_cliente(cliente):
         return
     return cliente.contas[0]
 
+@log_decorador
 def sacar(clientes):
     print(" SACAR ".center(50,"-")+"\n")
     cpf = input("Digite o CPF do cliente: => ")
@@ -227,8 +241,8 @@ def sacar(clientes):
     if not conta:
         return
     cliente.realizar_transacao(conta, transacao)
-    input(" Press Enter para voltar! ".center(50, "-"))
-
+    
+@log_decorador
 def depositar(clientes):
     print(" DEPOSITAR ".center(50,"-")+"\n")
     cpf = input("Digite o CPF do cliente: => ")
@@ -244,8 +258,8 @@ def depositar(clientes):
     if not conta:
         return
     cliente.realizar_transacao(conta, transacao)
-    input(" Press Enter para voltar! ".center(50, "-"))
-
+    
+@log_decorador
 def ver_extrato(clientes):
     print(" EXTRATO ".center(50,"-")+"\n")
     cpf = input("Digite o CPF do cliente: => ")
@@ -265,11 +279,11 @@ def ver_extrato(clientes):
         extrato = "Não foram feitas transações nesta conta."
     else: 
         for transacao in transacoes:
-            extrato += f"\n{transacao['tipo']}: \n\tR$ {transacao['valor']:.2f}"
+            extrato += f"{transacao['data']}\t {transacao['tipo']}: ".ljust(35)+f"R$ {transacao['valor']:.2f}".rjust(15)+"\n"
     print(extrato)
-    print(f"\nSaldo:\n\tR$ {conta.saldo:.2f}")
-    input(" Press Enter para voltar! ".center(50, "-"))
-
+    print(f"{"".center(50, "-")}\nSaldo:\n\tR$ {conta.saldo:.2f}")
+    
+@log_decorador
 def novo_cliente(clientes): 
     print(" CRIAR CLIENTE ".center(50,"-")+"\n")
     cpf = input("Digite o CPF do cliente: => ")
@@ -285,8 +299,8 @@ def novo_cliente(clientes):
     cliente = PessoaFisica(nome=nome,data_nascimento=data_nascimento,cpf=cpf,endereco=endereco)
     clientes.append(cliente)
     print(f"\nCliente - {nome.title()}, criado com sucesso!")
-    input(" Press Enter para voltar! ".center(50, "-"))
-    
+   
+@log_decorador   
 def nova_conta(numero_conta, clientes, contas):
     cpf = input("Digite o CPF do cliente: => ")
     cliente = verifica_cliente(cpf, clientes)
@@ -300,14 +314,14 @@ def nova_conta(numero_conta, clientes, contas):
     cliente.contas.append(conta)
 
     print("\nConta criada com sucesso!")
-    input(" Press Enter para voltar! ".center(50, "-"))
-
+    
+@log_decorador
 def listar_contas(contas):
     print(f"\n{" Contas Cadastradas! ".center(50, "-")}")
     for conta in contas:
         print("-"*50)
         print(textwrap.dedent(str(conta)))
-    input(" Press Enter para voltar! ".center(50, "-"))
+    
     
 def program():
     clientes = []
