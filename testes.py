@@ -17,6 +17,11 @@ def transacoes_do_dia(datas: list):
             
         return transasoes_dia
 
-print(transacoes_do_dia(gerar_data(20)))
+# print(transacoes_do_dia(gerar_data(20)))
 
-print(transacoes_do_dia.__name__)
+# print(transacoes_do_dia.__name__)
+
+
+print(len(oito:= "string"))
+
+print("\\".join(__file__.split(sep="\\")[:-1])+"\\")

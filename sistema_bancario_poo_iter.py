@@ -2,6 +2,28 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 import textwrap
 
+class ContaIterador:
+    def __init__(self, contas):
+        self.contas = contas
+        self._index = 0
+        
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        try:
+            conta = self.contas[self._index]
+            return f"""
+            Agência:\t{conta.agencia}
+            Número:\t\t{conta.numero}
+            Titular:\t\t{conta.cliente.nome}
+            Saldo:\t\tR$ {conta.saldo:.2f}
+        """
+        except IndexError:
+            raise StopIteration
+        finally:
+            self._index += 1
+
 class Cliente:
     def __init__(self, endereco):
         
@@ -67,25 +89,25 @@ class Conta:
     def depositar(self, valor):
         if valor > 0:
             self._saldo += valor
-            print(f"Depósito de R$ {valor:.2f} realizado com sucesso!")
+            print(f"\n-- Depósito de R$ {valor:.2f} realizado com sucesso! --")
             return True
         else:
-            print("ERRO - Valor inválido! Repita a operação!")
+            print("\n-- ERRO - Valor inválido! Repita a operação! --")
         return False
     
     def sacar(self, valor):
         saldo = self.saldo
         sem_saldo = valor > saldo
         if sem_saldo:
-            print(f"ERRO - Saldo = R$ {saldo:.2f} insuficiente! Digite outro valor!")
+            print(f"\n-- ERRO - Saldo = R$ {saldo:.2f} insuficiente! Digite outro valor! --")
             
         elif valor > 0:
             self._saldo -= valor
-            print(f"Saque de R$ {valor:.2f} realizado com sucesso!")
+            print(f"\n-- Saque de R$ {valor:.2f} realizado com sucesso! --")
             return True
         
         else:  
-            print("ERRO - Valor inválido! Repita a operação!")
+            print("\n-- ERRO - Valor inválido! Repita a operação! --")
         return False   
         
 class ContaCorrente(Conta):
@@ -105,11 +127,9 @@ class ContaCorrente(Conta):
         passou_limite = valor > self._limite
         
         if passou_limite:
-            print(f"ERRO - Valor acima do limite de R$ \
-                  {self._limite:.2f}.! Digite outro valor!")
+            print(f"\n-- ERRO - Valor acima do limite de R$ {self._limite:.2f}.! Digite outro valor! --")
         elif passou_saques:
-            print(f"ERRO - Excedeu quantidade de \
-                  {self._limite_saques} saques diários!")
+            print(f"\n-- ERRO - Excedeu quantidade de {self._limite_saques} saques diários! --")
         
         else:
             return super().sacar(valor)
@@ -121,6 +141,7 @@ class ContaCorrente(Conta):
             Agência:\t{self.agencia}
             C/C\t\t{self.numero}
             Titular\t{self.cliente.nome}
+            {"-"*50}
         """
 
 class Historico:
@@ -144,8 +165,10 @@ class Historico:
     
         return transasoes_dia
     
-    def gerar_relatorio(self):
-        pass
+    def gerar_relatorio(self, tipo_transacao=None):
+        for transacao in self._transacoes:
+            if tipo_transacao is None or transacao["tipo"].lower() == tipo_transacao.lower():
+                yield transacao
        
 class Transacao(ABC):
     @property
@@ -190,11 +213,10 @@ def log_decorador(funcao):
     def decora(*args, **kwargs):
         name_function =  str.join(" ",str.split(funcao.__name__, sep="_"))
         funcao(*args, **kwargs)
-        print(f"\n{datetime.now(timezone.utc).strftime("%d-%m-%Y %H:%M:%S")} - {name_function.title()}", end="\n\n")
+        print(f"{datetime.now(timezone.utc).strftime("%d-%m-%Y %H:%M:%S")} - {name_function.title()}", end="\n\n")
         input(" Press Enter para voltar! ".center(50, "-"))
     return decora
     
- 
 def menu(): 
 
     clientes = []
@@ -220,7 +242,7 @@ def verifica_cliente(cpf, clientes):
 
 def verifica_conta_cliente(cliente):
     if not cliente.contas:
-        print(f"ERRO - Cliente: {cliente.nome}, não possui conta.")
+        print(f"\n-- ERRO - Cliente: {cliente.nome}, não possui conta. --")
         input(" Press Enter para voltar! ".center(50, "-"))
         return
     return cliente.contas[0]
@@ -232,7 +254,7 @@ def sacar(clientes):
     cliente = verifica_cliente(cpf, clientes)
 
     if not cliente:
-        print("ERRO - Cliente não encontrado!")
+        print("\n-- ERRO - Cliente não encontrado! --")
         return
     valor = float(input("Digite o valor para saque: => "))
     transacao = Saque(valor)  
@@ -249,7 +271,7 @@ def depositar(clientes):
     cliente = verifica_cliente(cpf, clientes)
 
     if not cliente:
-        print("ERRO - Cliente não encontrado!")
+        print("\n-- ERRO - Cliente não encontrado! --")
         return
     valor = float(input("Digite o valor para depósito: => "))
     transacao = Deposito(valor)  
@@ -266,20 +288,32 @@ def ver_extrato(clientes):
     cliente = verifica_cliente(cpf, clientes)
 
     if not cliente:
-        print("ERRO - Cliente não encontrado!")
+        print("\n-- ERRO - Cliente não encontrado! --")
         return
    
-    conta = verifica_conta_cliente(cliente)
+    conta: Conta = verifica_conta_cliente(cliente)
     if not conta:
         return
     print(" EXTRATO ".center(50,"-")+"\n")
     transacoes = conta.historico.transacoes
     extrato = ""
     if not transacoes:
-        extrato = "Não foram feitas transações nesta conta."
+        extrato = "\n-- Não foram feitas transações nesta conta. --"
     else: 
-        for transacao in transacoes:
-            extrato += f"{transacao['data']}\t {transacao['tipo']}: ".ljust(35)+f"R$ {transacao['valor']:.2f}".rjust(15)+"\n"
+        menu = f"""
+        Escolha o tipo de extrato: 
+        
+        [1] Depósitos
+        [2] Saques
+        [3] Todos
+        
+        => 
+        """
+        tipos_extratos = {"1": "deposito", "2":"saque", "3": None }
+        tipo_extrato = input(textwrap.dedent(menu))
+
+        for transacao in conta.historico.gerar_relatorio(tipos_extratos[tipo_extrato] if tipo_extrato in tipos_extratos else None):
+            extrato += f"{transacao["data"]}\t {transacao["tipo"]}: ".ljust(35)+f"R$ {transacao["valor"]:.2f}".rjust(15)+"\n"
     print(extrato)
     print(f"{"".center(50, "-")}\nSaldo:\n\tR$ {conta.saldo:.2f}")
     
@@ -298,7 +332,7 @@ def novo_cliente(clientes):
 
     cliente = PessoaFisica(nome=nome,data_nascimento=data_nascimento,cpf=cpf,endereco=endereco)
     clientes.append(cliente)
-    print(f"\nCliente - {nome.title()}, criado com sucesso!")
+    print(f"\n-- Cliente '{nome.title()}', criado com sucesso! --")
    
 @log_decorador   
 def nova_conta(numero_conta, clientes, contas):
@@ -313,13 +347,13 @@ def nova_conta(numero_conta, clientes, contas):
     contas.append(conta)
     cliente.contas.append(conta)
 
-    print("\nConta criada com sucesso!")
+    print("\n-- Conta criada com sucesso! --")
     
 @log_decorador
 def listar_contas(contas):
     print(f"\n{" Contas Cadastradas! ".center(50, "-")}")
-    for conta in contas:
-        print("-"*50)
+    
+    for conta in ContaIterador(contas):
         print(textwrap.dedent(str(conta)))
     
     
